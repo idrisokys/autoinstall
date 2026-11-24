@@ -1,0 +1,42 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derle (osacompile)
+        run: |
+          mkdir -p build
+          osacompile -o "build/Kolay Kurulum.app" src/KolayKurulum.applescript
+          xattr -cr "build/Kolay Kurulum.app"
+          codesign --force --deep --sign - "build/Kolay Kurulum.app"
+          codesign --verify --deep --strict "build/Kolay Kurulum.app"
+
+      - name: Zip'le
+        run: |
+          cd build
+          ditto -c -k --keepParent "Kolay Kurulum.app" KolayKurulum-macOS.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KolayKurulum-macOS
+          path: build/KolayKurulum-macOS.zip
+
+      - name: Release oluştur (v* etiketi)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/KolayKurulum-macOS.zip
+          generate_release_notes: true
