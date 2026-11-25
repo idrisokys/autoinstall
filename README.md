@@ -7,12 +7,12 @@ macOS 15 (Sequoia) ve Apple Silicon için sürükle-bırak uygulama kurucusu.
 
 ## Ne yapar?
 
-- Uygulamayı `/Applications` klasörüne kopyalar (varsa üzerine yazmadan önce sorar)
+- Uygulamayı `/Applications` klasörüne kopyalar; aynı uygulama (aynı ad veya aynı Bundle ID) zaten kuruluysa önce onu kapatıp siler, sonra yenisini kurar (soru sormaz)
 - Karantina işaretini kaldırır (`xattr -cr`), böylece "hasarlı / doğrulanamadı" uyarısı çıkmaz
 - İmza doğrulanamıyorsa ad-hoc imzalar (`codesign --sign -`)
 - Uygulama yalnızca Intel ise ve Rosetta yoksa kurulumunu önerir
 - `.dmg` dosyasını bağlar, içindeki uygulamaları kurar, dmg'yi çıkarır
-- `.zip` dosyasını açıp içindeki uygulamaları kurar
+- `.zip` dosyasını açıp içindeki uygulamaları kurar; iki kere (iç içe) zip'lenmiş uygulamalarda da çalışır (zip içinde zip / dmg / pkg, en fazla 6 kat)
 - `.pkg` dosyasının karantinasını kaldırıp Yükleyici ile açar
 - Kurulum bitince uygulamayı otomatik başlatır
 
@@ -39,10 +39,16 @@ cd KolayKurulum
 
 Kurulacak dosyayı `Kolay Kurulum` simgesinin (Finder, Dock veya masaüstü) üzerine sürükleyip bırakın. Gerekirse yönetici şifresi sorulur.
 
+Uygulama açılış/bilgi ekranı göstermez. Dock'ta kalması için uygulamayı bir kez açıp Dock simgesine sağ tık → **Seçenekler → Dock'ta Tut** deyin (ya da `/Applications` içinden Dock'a sürükleyin).
+
+Simge (ağzı açık Pac-Man) `assets/AppIcon.icns` dosyasıdır; `python3 assets/make_icon.py` ile yeniden üretilebilir (Pillow gerekir).
+
 ## Proje yapısı
 
 ```
 src/KolayKurulum.applescript   Uygulamanın kaynak kodu (droplet)
+assets/AppIcon.icns            Uygulama simgesi (Pac-Man)
+assets/make_icon.py            Simgeyi üreten betik
 Olustur.command                Yerel derleme betiği
 .github/workflows/build.yml    CI: derler, zip'ler, v* etiketinde Release oluşturur
 ```

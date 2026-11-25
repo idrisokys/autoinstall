@@ -3,6 +3,8 @@
 cd "$(dirname "$0")" || exit 1
 rm -rf "build/Kolay Kurulum.app"; mkdir -p build
 osacompile -o "build/Kolay Kurulum.app" src/KolayKurulum.applescript || { echo "Derleme başarısız"; exit 1; }
+cp assets/AppIcon.icns "build/Kolay Kurulum.app/Contents/Resources/applet.icns"
+touch "build/Kolay Kurulum.app"
 xattr -cr "build/Kolay Kurulum.app"
 codesign --force --deep --sign - "build/Kolay Kurulum.app" 2>/dev/null
 rm -rf "/Applications/Kolay Kurulum.app"

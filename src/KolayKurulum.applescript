@@ -2,14 +2,19 @@
 -- macOS 15 (Sequoia) + Apple Silicon için hazırlandı.
 
 property appsFolder : "/Applications/"
+property nestLevel : 0
+property maxNest : 6
 global installedPaths
 
 on run
-	display dialog "Kurulacak dosyayı (.app, .dmg, .zip veya .pkg) bu simgenin üzerine sürükleyip bırakın." & return & return & "Otomatik yapılanlar:" & return & "• /Applications klasörüne kopyalama" & return & "• Karantina (\"hasarlı/doğrulanamadı\") işaretini kaldırma" & return & "• Gerekirse imzayı onarma (ad-hoc)" & return & "• Gerekirse Rosetta kurulumu" & return & "• Kurulum bitince uygulamayı otomatik başlatma" buttons {"Tamam"} default button 1 with title "Kolay Kurulum" with icon note
+	-- Bilgi ekranı yok: simgeye çift tıklanırsa hiçbir şey göstermeden kapanır.
+	-- Dosyalar simgenin üzerine bırakılınca "on open" çalışır.
 end run
 
 on open droppedItems
+	global installedPaths
 	set installedPaths to {}
+	set nestLevel to 0
 	set report to {}
 	set hadProblem to false
 	repeat with anItem in droppedItems
@@ -60,16 +65,13 @@ end processItem
 -- ===== Kurulum işleyicileri =====
 
 on installApp(appPath)
+	global installedPaths
 	set appName to baseName(appPath)
 	set dest to appsFolder & appName
 	set q to quoted form of dest
 	if appPath is not dest then
-		set alreadyThere to (sh("[ -e " & q & " ] && echo 1 || echo 0") is "1")
-		if alreadyThere then
-			display dialog appName & " zaten kurulu. Üzerine yazılsın mı?" buttons {"İptal", "Değiştir"} default button 2 cancel button 1 with title "Kolay Kurulum" with icon caution
-			shAdmin("rm -rf " & q)
-		end if
-		shAdmin("ditto " & quoted form of appPath & " " & q)
+		-- Kurulu sürüm (aynı ad veya aynı Bundle ID) varsa önce kaldırılır, sonra yenisi kurulur
+		shAdmin("/bin/bash -c " & quoted form of replaceScript() & " _ " & quoted form of appPath & " " & quoted form of dest)
 	end if
 	-- 1) Karantina ve diğer genişletilmiş öznitelikleri temizle
 	shAdmin("xattr -cr " & q)
@@ -110,25 +112,114 @@ on installApp(appPath)
 	return appName & " kuruldu" & notes
 end installApp
 
+-- Yeni sürümü önce geçici adla kopyalar (kopyalama başarısız olursa eski uygulama silinmez),
+-- sonra aynı ada veya aynı Bundle ID'ye sahip kurulu uygulamaları kapatıp siler ve yenisini yerine koyar.
+on replaceScript()
+	set L to {}
+	set end of L to "set -e"
+	set end of L to "src=\"$1\"; dest=\"$2\""
+	set end of L to "pb=/usr/libexec/PlistBuddy"
+	set end of L to "bid=$($pb -c 'Print :CFBundleIdentifier' \"$src/Contents/Info.plist\" 2>/dev/null || true)"
+	set end of L to "new=\"$dest.kknew\""
+	set end of L to "rm -rf \"$new\""
+	set end of L to "ditto \"$src\" \"$new\""
+	set end of L to "for a in /Applications/*.app; do"
+	set end of L to "  [ -d \"$a\" ] || continue"
+	set end of L to "  [ \"$a\" = \"$src\" ] && continue"
+	set end of L to "  id=$($pb -c 'Print :CFBundleIdentifier' \"$a/Contents/Info.plist\" 2>/dev/null || true)"
+	set end of L to "  if [ \"$a\" = \"$dest\" ] || { [ -n \"$bid\" ] && [ \"$id\" = \"$bid\" ]; }; then"
+	set end of L to "    if [ -n \"$id\" ]; then osascript -e \"if application id \\\"$id\\\" is running then tell application id \\\"$id\\\" to quit\" >/dev/null 2>&1 || true; fi"
+	set end of L to "    sleep 1"
+	set end of L to "    pkill -f \"$a/Contents/MacOS/\" 2>/dev/null || true"
+	set end of L to "    rm -rf \"$a\""
+	set end of L to "  fi"
+	set end of L to "done"
+	set end of L to "rm -rf \"$dest\""
+	set end of L to "mv \"$new\" \"$dest\""
+	set AppleScript's text item delimiters to linefeed
+	set t to L as text
+	set AppleScript's text item delimiters to ""
+	return t
+end replaceScript
+
 on installMany(appList)
 	set out to {}
 	repeat with a in appList
 		if (contents of a) is not "" then set end of out to installApp(contents of a)
 	end repeat
 	if (count of out) is 0 then error "İçinde .app bulunamadı"
+	return joinResults(out)
+end installMany
+
+on joinResults(lst)
 	set AppleScript's text item delimiters to return & "✓ "
-	set t to out as text
+	set t to lst as text
 	set AppleScript's text item delimiters to ""
 	return t
-end installMany
+end joinResults
+
+on nonEmpty(lst)
+	set out to {}
+	repeat with a in lst
+		if (contents of a) is not "" then set end of out to (contents of a)
+	end repeat
+	return out
+end nonEmpty
+
+-- Bir klasörün içinde (.dmg bağlama noktası veya açılmış .zip) önce .app arar;
+-- .app yoksa iç içe arşivleri (zip içinde zip / dmg / pkg) bulup aynı işlemi onlar için tekrarlar.
+on installFromFolder(folder, md)
+	set qf to quoted form of folder
+	set skip to "\\( -name __MACOSX -o -name '._*' \\) -prune -o "
+	set apps to nonEmpty(paragraphs of sh("find " & qf & " -maxdepth " & md & " " & skip & "-type d -iname '*.app' -prune -print || true"))
+	if (count of apps) > 0 then return installMany(apps)
+
+	set nested to nonEmpty(paragraphs of sh("find " & qf & " -maxdepth " & md & " " & skip & "-type d -iname '*.app' -prune -o -type f \\( -iname '*.zip' -o -iname '*.dmg' -o -iname '*.pkg' \\) -print || true"))
+	set isOdd to false
+	if (count of nested) is 0 then
+		-- Uzantısı eksik/yanlış olan iç zip dosyaları (içeriğine bakarak bulunur)
+		set nested to nonEmpty(paragraphs of sh("find " & qf & " -maxdepth " & md & " " & skip & "-type d -iname '*.app' -prune -o -type f -print | while IFS= read -r f; do case \"$(file -b \"$f\")\" in Zip\\ archive*) echo \"$f\";; esac; done || true"))
+		set isOdd to true
+	end if
+	if (count of nested) is 0 then error "İçinde .app bulunamadı"
+
+	set results to {}
+	set lastErr to ""
+	repeat with n in nested
+		set np to contents of n
+		try
+			if isOdd then
+				set end of results to installZip(np)
+			else
+				set end of results to processNested(np)
+			end if
+		on error m number num
+			if num is -128 then error m number num
+			set lastErr to m
+		end try
+	end repeat
+	if (count of results) is 0 then error lastErr
+	return joinResults(results)
+end installFromFolder
+
+on processNested(p)
+	set lowerP to sh("echo " & quoted form of p & " | tr '[:upper:]' '[:lower:]'")
+	if lowerP ends with ".dmg" then return installDMG(p)
+	if lowerP ends with ".pkg" then
+		-- Geçici klasör silineceği için pkg'yi kalıcı bir yere kopyalayıp öyle aç
+		set keepDir to sh("mktemp -d")
+		sh("cp " & quoted form of p & " " & quoted form of keepDir & "/")
+		return installPkg(keepDir & "/" & baseName(p))
+	end if
+	return installZip(p)
+end processNested
 
 on installDMG(dmgPath)
 	set outp to sh("yes | hdiutil attach -nobrowse -readonly -noverify " & quoted form of dmgPath & " | tail -1")
 	set mountPoint to sh("echo " & quoted form of outp & " | cut -f3-")
 	if mountPoint is "" then error "DMG bağlanamadı"
 	try
-		set found to paragraphs of sh("find " & quoted form of mountPoint & " -maxdepth 2 -name '*.app' -not -path '*/.*' || true")
-		set r to installMany(found)
+		set r to installFromFolder(mountPoint, 2)
 	on error m number n
 		try
 			sh("hdiutil detach " & quoted form of mountPoint & " -force")
@@ -142,20 +233,32 @@ on installDMG(dmgPath)
 end installDMG
 
 on installZip(zipPath)
+	if nestLevel ≥ maxNest then error "Arşiv çok fazla iç içe (en fazla " & maxNest & " kat)"
+	set nestLevel to nestLevel + 1
 	set tmp to sh("mktemp -d")
 	try
-		sh("ditto -x -k " & quoted form of zipPath & " " & quoted form of tmp)
-		set found to paragraphs of sh("find " & quoted form of tmp & " -maxdepth 3 -name '*.app' -not -path '*/__MACOSX/*' || true")
-		set r to installMany(found)
+		extractZip(zipPath, tmp)
+		set r to installFromFolder(tmp, 4)
 	on error m number n
+		set nestLevel to nestLevel - 1
 		try
 			sh("rm -rf " & quoted form of tmp)
 		end try
 		error m number n
 	end try
+	set nestLevel to nestLevel - 1
 	sh("rm -rf " & quoted form of tmp)
 	return r
 end installZip
+
+on extractZip(zipPath, destDir)
+	try
+		sh("ditto -x -k " & quoted form of zipPath & " " & quoted form of destDir)
+	on error
+		-- ditto bazı zip'leri açamazsa unzip ile dene
+		sh("/usr/bin/unzip -qq -o " & quoted form of zipPath & " -d " & quoted form of destDir)
+	end try
+end extractZip
 
 on installPkg(pkgPath)
 	sh("xattr -c " & quoted form of pkgPath)
