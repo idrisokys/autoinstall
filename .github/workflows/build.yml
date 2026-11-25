@@ -16,13 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Derle (osacompile)
-        run: |
-          mkdir -p build
-          osacompile -o "build/elmakurdu.app" src/elmakurdu.applescript
-          cp assets/elmakurdu.icns "build/elmakurdu.app/Contents/Resources/applet.icns"; cp src/expand.sh "build/elmakurdu.app/Contents/Resources/"; xattr -cr "build/elmakurdu.app"
-          codesign --force --deep --sign - "build/elmakurdu.app"
-          codesign --verify --deep --strict "build/elmakurdu.app"
+      - name: Derle
+        run: ./build.sh
 
       - name: Zip'le
         run: |

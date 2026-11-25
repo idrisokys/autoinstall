@@ -44,7 +44,8 @@ Kurulacak dosyayı `elmakurdu` simgesinin (Finder, Dock veya masaüstü) üzerin
 src/elmakurdu.applescript   Uygulamanın kaynak kodu (droplet)
 src/expand.sh                İç içe zip açıcı (uygulamanın içine gömülür)
 assets/elmakurdu.icns        Uygulama simgesi
-Olustur.command                Yerel derleme betiği
+Olustur.command                Yerel derleme + kurulum betiği
+build.sh                       Derleme betiği (yerel ve CI ortak)
 .github/workflows/build.yml    CI: derler, zip'ler, v* etiketinde Release oluşturur
 ```
 
