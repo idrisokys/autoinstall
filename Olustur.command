@@ -1,7 +1,7 @@
 #!/bin/bash
 # elmakurdu.app dosyasını kaynaktan derler ve /Applications içine kurar. Mac'te çift tıklayarak çalıştırın.
 cd "$(dirname "$0")" || exit 1
-./build.sh || { echo "Derleme başarısız"; exit 1; }
+bash build.sh || { echo "Derleme başarısız"; exit 1; }
 
 osascript -e 'tell application "elmakurdu" to quit' >/dev/null 2>&1
 rm -rf "/Applications/elmakurdu.app"
