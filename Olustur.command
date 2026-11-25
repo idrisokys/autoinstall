@@ -1,13 +1,28 @@
 #!/bin/bash
-# Installer.app dosyasını kaynaktan derler. Mac'te çift tıklayarak çalıştırın.
+# elmakurdu.app dosyasını kaynaktan derler. Mac'te çift tıklayarak çalıştırın.
 cd "$(dirname "$0")" || exit 1
-rm -rf "build/Installer.app"; mkdir -p build
-osacompile -o "build/Installer.app" src/Installer.applescript || { echo "Derleme başarısız"; exit 1; }
-cp assets/AppIcon.icns "build/Installer.app/Contents/Resources/applet.icns"
-touch "build/Installer.app"
-xattr -cr "build/Installer.app"
-codesign --force --deep --sign - "build/Installer.app" 2>/dev/null
-rm -rf "/Applications/Kolay Kurulum.app" "/Applications/Installer.app"
-cp -R "build/Installer.app" /Applications/ && echo "✓ /Applications içine kopyalandı"
-echo "✓ Hazır: $(pwd)/build/Installer.app"
-open -R "/Applications/Installer.app"
+APP="build/elmakurdu.app"
+rm -rf "$APP"; mkdir -p build
+osacompile -o "$APP" src/elmakurdu.applescript || { echo "Derleme başarısız"; exit 1; }
+
+# Simge ve yardımcı betik
+rm -f "$APP/Contents/Resources/Assets.car"
+cp assets/elmakurdu.icns "$APP/Contents/Resources/applet.icns"
+cp src/expand.sh "$APP/Contents/Resources/expand.sh"
+PL="$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$PL" 2>/dev/null
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile applet" "$PL" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string applet" "$PL"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName elmakurdu" "$PL" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleName string elmakurdu" "$PL"
+/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName elmakurdu" "$PL" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string elmakurdu" "$PL"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier local.elmakurdu.app" "$PL" 2>/dev/null
+
+xattr -cr "$APP"
+codesign --force --deep --sign - "$APP" 2>/dev/null
+
+# Çalışan eski sürümü kapat, sil, yenisini kopyala
+osascript -e 'tell application "elmakurdu" to quit' >/dev/null 2>&1
+rm -rf "/Applications/elmakurdu.app"
+cp -R "$APP" /Applications/ && echo "✓ /Applications içine kopyalandı"
+touch "/Applications/elmakurdu.app"
+echo "✓ Hazır: $(pwd)/$APP"
+open -R "/Applications/elmakurdu.app"
