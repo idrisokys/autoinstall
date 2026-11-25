@@ -19,26 +19,26 @@ jobs:
       - name: Derle (osacompile)
         run: |
           mkdir -p build
-          osacompile -o "build/Kolay Kurulum.app" src/KolayKurulum.applescript
-          cp assets/AppIcon.icns "build/Kolay Kurulum.app/Contents/Resources/applet.icns"
-          touch "build/Kolay Kurulum.app"
-          xattr -cr "build/Kolay Kurulum.app"
-          codesign --force --deep --sign - "build/Kolay Kurulum.app"
-          codesign --verify --deep --strict "build/Kolay Kurulum.app"
+          osacompile -o "build/Installer.app" src/Installer.applescript
+          cp assets/AppIcon.icns "build/Installer.app/Contents/Resources/applet.icns"
+          touch "build/Installer.app"
+          xattr -cr "build/Installer.app"
+          codesign --force --deep --sign - "build/Installer.app"
+          codesign --verify --deep --strict "build/Installer.app"
 
       - name: Zip'le
         run: |
           cd build
-          ditto -c -k --keepParent "Kolay Kurulum.app" KolayKurulum-macOS.zip
+          ditto -c -k --keepParent "Installer.app" Installer-macOS.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KolayKurulum-macOS
-          path: build/KolayKurulum-macOS.zip
+          name: Installer-macOS
+          path: build/Installer-macOS.zip
 
       - name: Release oluştur (v* etiketi)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/KolayKurulum-macOS.zip
+          files: build/Installer-macOS.zip
           generate_release_notes: true

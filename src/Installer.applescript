@@ -1,4 +1,4 @@
--- Kolay Kurulum: .app / .dmg / .zip / .pkg dosyasını simgenin üzerine bırakın, gerisini o halleder.
+-- Installer: .app / .dmg / .zip / .pkg dosyasını simgenin üzerine bırakın, gerisini o halleder.
 -- macOS 15 (Sequoia) + Apple Silicon için hazırlandı.
 
 property appsFolder : "/Applications/"
@@ -32,6 +32,19 @@ on open droppedItems
 		end try
 	end repeat
 	
+	-- Kurulan uygulamaları Dock'a ekle (zaten varsa dokunmaz)
+	set dockChanged to false
+	repeat with ap in installedPaths
+		try
+			if sh("/bin/bash -c " & quoted form of dockScript() & " _ " & quoted form of (contents of ap)) is "added" then set dockChanged to true
+		end try
+	end repeat
+	if dockChanged then
+		try
+			sh("killall Dock")
+		end try
+	end if
+	
 	-- Kurulan uygulamaları otomatik başlat
 	repeat with ap in installedPaths
 		try
@@ -46,9 +59,9 @@ on open droppedItems
 		set AppleScript's text item delimiters to return
 		set msg to report as text
 		set AppleScript's text item delimiters to ""
-		display dialog msg buttons {"Tamam"} default button 1 with title "Kolay Kurulum" with icon caution
+		display dialog msg buttons {"Tamam"} default button 1 with title "Installer" with icon caution
 	else if (count of installedPaths) > 0 then
-		display notification "Kuruldu ve başlatıldı: " & (count of installedPaths) & " uygulama" with title "Kolay Kurulum"
+		display notification "Kuruldu, Dock'a eklendi ve başlatıldı: " & (count of installedPaths) & " uygulama" with title "Installer"
 	end if
 end open
 
@@ -101,7 +114,7 @@ on installApp(appPath)
 			set hasRosetta to false
 		end try
 		if not hasRosetta then
-			display dialog appName & " Intel (x86_64) uygulaması; Rosetta 2 gerekiyor. Şimdi kurulsun mu?" buttons {"Hayır", "Rosetta Kur"} default button 2 with title "Kolay Kurulum"
+			display dialog appName & " Intel (x86_64) uygulaması; Rosetta 2 gerekiyor. Şimdi kurulsun mu?" buttons {"Hayır", "Rosetta Kur"} default button 2 with title "Installer"
 			if button returned of result is "Rosetta Kur" then
 				shAdmin("softwareupdate --install-rosetta --agree-to-license")
 				set notes to notes & " [Rosetta kuruldu]"
@@ -141,6 +154,21 @@ on replaceScript()
 	set AppleScript's text item delimiters to ""
 	return t
 end replaceScript
+
+-- Uygulamayı kullanıcının Dock'una ekler. Dock'ta zaten varsa "exists", eklediyse "added" döner.
+on dockScript()
+	set L to {}
+	set end of L to "p=\"$1\""
+	set end of L to "enc=$(printf %s \"$p\" | sed 's/%/%25/g; s/ /%20/g; s/&/%26/g; s/</%3C/g; s/>/%3E/g; s/#/%23/g')"
+	set end of L to "cur=$(defaults read com.apple.dock persistent-apps 2>/dev/null || true)"
+	set end of L to "if printf %s \"$cur\" | grep -qF \"file://$enc/\"; then echo exists; exit 0; fi"
+	set end of L to "defaults write com.apple.dock persistent-apps -array-add \"<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>file://$enc/</string><key>_CFURLStringType</key><integer>15</integer></dict></dict></dict>\""
+	set end of L to "echo added"
+	set AppleScript's text item delimiters to linefeed
+	set t to L as text
+	set AppleScript's text item delimiters to ""
+	return t
+end dockScript
 
 on installMany(appList)
 	set out to {}

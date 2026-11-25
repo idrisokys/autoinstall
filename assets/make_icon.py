@@ -1,30 +1,42 @@
 #!/usr/bin/env python3
-"""Pac-Man uygulama simgesini (AppIcon.icns) üretir. Gerekli: pip install pillow"""
-import struct, io
+"""Installer uygulama simgesini (AppIcon.icns) üretir. Gerekli: pip install pillow"""
+import struct, io, os
 from PIL import Image, ImageDraw
 
-S = 4096  # süper-örnekleme boyutu
+S = 4096
+
+
+def gradient(size, top, bottom):
+    g = Image.new("RGBA", (size, size))
+    px = g.load()
+    for y in range(size):
+        t = y / (size - 1)
+        c = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)) + (255,)
+        for x in range(size):
+            px[x, y] = c
+    return g
 
 
 def draw():
+    m = int(S * 0.098); r = int(S * 0.225)
+    bg = gradient(S, (64, 156, 255), (20, 70, 220))
+    mask = Image.new("L", (S, S), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([m, m, S - m, S - m], r, fill=255)
     img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    img.paste(bg, (0, 0), mask)
     d = ImageDraw.Draw(img)
-    # macOS tarzı yuvarlatılmış kare zemin (kenarlarda boşluk bırakır)
-    m = int(S * 0.098)
-    r = int(S * 0.225)
-    d.rounded_rectangle([m, m, S - m, S - m], r, fill=(14, 18, 52, 255))
-    # Pac-Man: ağzı açık (yaklaşık 70° açıklık), sağa bakıyor
-    cx, cy, R = int(S * 0.42), int(S * 0.5), int(S * 0.255)
-    half = 36
-    d.pieslice([cx - R, cy - R, cx + R, cy + R], half, 360 - half, fill=(255, 214, 10, 255))
-    # göz
-    ex, ey, er = cx + int(R * 0.05), cy - int(R * 0.52), int(R * 0.115)
-    d.ellipse([ex - er, ey - er, ex + er, ey + er], fill=(14, 18, 52, 255))
-    # yenecek noktalar (kurulacak uygulamalar)
-    for x in (0.665, 0.745, 0.825):
-        pr = int(S * 0.03)
-        px = int(S * x)
-        d.ellipse([px - pr, cy - pr, px + pr, cy + pr], fill=(255, 245, 200, 255))
+    W = (255, 255, 255, 255)
+    cx = S // 2
+    bx0, bx1 = int(S * 0.27), int(S * 0.73)
+    by0, by1 = int(S * 0.58), int(S * 0.76)
+    d.rounded_rectangle([bx0, by0, bx1, by1], int(S * 0.04), fill=W)
+    t = int(S * 0.045)
+    d.rounded_rectangle([bx0, int(S * 0.50), bx0 + t, by1], t // 2, fill=W)
+    d.rounded_rectangle([bx1 - t, int(S * 0.50), bx1, by1], t // 2, fill=W)
+    sw = int(S * 0.075)
+    d.rounded_rectangle([cx - sw, int(S * 0.20), cx + sw, int(S * 0.45)], sw // 2, fill=W)
+    hw = int(S * 0.17)
+    d.polygon([(cx - hw, int(S * 0.42)), (cx + hw, int(S * 0.42)), (cx, int(S * 0.58))], fill=W)
     return img
 
 
@@ -40,7 +52,6 @@ def icns(img):
 
 
 if __name__ == "__main__":
-    import os
     here = os.path.dirname(os.path.abspath(__file__))
     img = draw()
     open(os.path.join(here, "AppIcon.icns"), "wb").write(icns(img))

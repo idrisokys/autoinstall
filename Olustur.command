@@ -1,13 +1,13 @@
 #!/bin/bash
-# Kolay Kurulum.app dosyasını kaynaktan derler. Mac'te çift tıklayarak çalıştırın.
+# Installer.app dosyasını kaynaktan derler. Mac'te çift tıklayarak çalıştırın.
 cd "$(dirname "$0")" || exit 1
-rm -rf "build/Kolay Kurulum.app"; mkdir -p build
-osacompile -o "build/Kolay Kurulum.app" src/KolayKurulum.applescript || { echo "Derleme başarısız"; exit 1; }
-cp assets/AppIcon.icns "build/Kolay Kurulum.app/Contents/Resources/applet.icns"
-touch "build/Kolay Kurulum.app"
-xattr -cr "build/Kolay Kurulum.app"
-codesign --force --deep --sign - "build/Kolay Kurulum.app" 2>/dev/null
-rm -rf "/Applications/Kolay Kurulum.app"
-cp -R "build/Kolay Kurulum.app" /Applications/ && echo "✓ /Applications içine kopyalandı"
-echo "✓ Hazır: $(pwd)/build/Kolay Kurulum.app"
-open -R "/Applications/Kolay Kurulum.app"
+rm -rf "build/Installer.app"; mkdir -p build
+osacompile -o "build/Installer.app" src/Installer.applescript || { echo "Derleme başarısız"; exit 1; }
+cp assets/AppIcon.icns "build/Installer.app/Contents/Resources/applet.icns"
+touch "build/Installer.app"
+xattr -cr "build/Installer.app"
+codesign --force --deep --sign - "build/Installer.app" 2>/dev/null
+rm -rf "/Applications/Kolay Kurulum.app" "/Applications/Installer.app"
+cp -R "build/Installer.app" /Applications/ && echo "✓ /Applications içine kopyalandı"
+echo "✓ Hazır: $(pwd)/build/Installer.app"
+open -R "/Applications/Installer.app"
